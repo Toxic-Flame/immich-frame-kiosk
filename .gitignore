@@ -1,0 +1,16 @@
+# Android build output
+android/build/
+android/gen/
+android/obj/
+*.keystore
+*.idsig
+
+# Python/cache/logs/secrets
+__pycache__/
+*.pyc
+*.log
+.env
+secrets.*
+
+# Local config
+local/

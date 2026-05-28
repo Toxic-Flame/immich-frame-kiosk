@@ -1,0 +1,94 @@
+# A.L.I.C.E. Immich -> Frameo launcher
+# Starts the WSL slideshow bridge, exposes a Windows LAN proxy, and launches the Android kiosk app when USB/ADB is attached.
+# The frame itself uses LAN URL http://frameo-bridge.local:8098/frameo (or your bridge host/IP), so USB is only needed for install/maintenance/relaunch.
+
+$ErrorActionPreference = 'Continue'
+$AliceDir = Join-Path $env:USERPROFILE 'Documents\ImmichFrameKiosk'
+$LogDir = Join-Path $AliceDir 'Logs'
+$Adb = Join-Path $AliceDir 'Tools\platform-tools\adb.exe'
+$ProxyScript = Join-Path $AliceDir 'frameo-lan-proxy.py'
+$Log = Join-Path $LogDir 'immich-frameo-launcher.log'
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+
+function Log($msg) {
+  $line = "$(Get-Date -Format s) $msg"
+  Add-Content -Path $Log -Value $line
+  Write-Host $line
+}
+
+function Ensure-LanProxy {
+  if (!(Test-Path $ProxyScript)) {
+    Log "LAN proxy script missing at $ProxyScript"
+    return $false
+  }
+  $existing = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*frameo-lan-proxy.py*' }
+  if ($existing) {
+    Log "LAN proxy already running: PID(s) $($existing.ProcessId -join ',')"
+  } else {
+    Log 'Starting Windows LAN proxy on 0.0.0.0:8098 -> 127.0.0.1:8099'
+    Start-Process -FilePath 'python' -ArgumentList @($ProxyScript) -WindowStyle Hidden | Out-Null
+    Start-Sleep -Seconds 2
+  }
+  try {
+    $status = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8098/status' -TimeoutSec 8
+    Log "LAN proxy OK: $($status.Content)"
+    return $true
+  } catch {
+    Log "LAN proxy not reachable: $($_.Exception.Message)"
+    return $false
+  }
+}
+
+Log '=== Immich Frameo launcher start ==='
+
+# Start the bridge inside the default WSL distro if it is not already running.
+$wslCmd = @'
+mkdir -p /home/YOUR_WSL_USER/.hermes/logs
+export IMMICH_API_KEY="REPLACE_WITH_YOUR_IMMICH_API_KEY"
+export IMMICH_BASE="http://127.0.0.1:2283"
+export FRAMEO_SOURCE=albums_faces
+exec /usr/bin/python3 /home/YOUR_WSL_USER/immich-frame-kiosk/bridge/immich_frameo_bridge.py >> /home/YOUR_WSL_USER/.hermes/logs/immich-frameo-bridge.log 2>&1
+'@
+Log 'Starting/checking WSL Immich bridge'
+$BridgeStart = Join-Path $AliceDir 'start-immich-frameo-bridge.sh'
+Set-Content -Path $BridgeStart -Value $wslCmd -NoNewline -Encoding ASCII
+$existingBridge = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*immich_frameo_bridge.py*' -or $_.CommandLine -like '*start-immich-frameo-bridge.sh*' }
+if ($existingBridge) {
+  Log "WSL bridge process already running: Windows PID(s) $($existingBridge.ProcessId -join ',')"
+} else {
+  Start-Process -FilePath 'wsl.exe' -ArgumentList @('--','bash','/mnt/c/Users/YOUR_WINDOWS_USER/Documents/ImmichFrameKiosk/start-immich-frameo-bridge.sh') -WindowStyle Hidden | Out-Null
+}
+Start-Sleep -Seconds 8
+
+try {
+  $status = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8099/status' -TimeoutSec 8
+  Log "Bridge OK: $($status.Content)"
+} catch {
+  Log "Bridge not reachable on Windows localhost: $($_.Exception.Message)"
+  exit 3
+}
+
+if (-not (Ensure-LanProxy)) { exit 5 }
+
+# USB/ADB is optional now. If present, keep the kiosk awake and launch it; if not, LAN slideshow still works for already-installed kiosk.
+if (!(Test-Path $Adb)) {
+  Log "adb.exe missing at $Adb; skipping USB launch. LAN proxy remains active."
+  exit 0
+}
+
+$devices = & $Adb devices -l
+$devices | ForEach-Object { Log "ADB: $_" }
+if (-not (($devices -join "`n") -match '\bdevice\b')) {
+  Log 'No authorised Android/Frameo device found. Skipping USB launch. Already-installed kiosk can still use LAN.'
+  exit 0
+}
+
+Log 'Applying frame power-management settings and launching kiosk app'
+& $Adb shell settings put global stay_on_while_plugged_in 0 | Out-Null
+& $Adb shell svc power stayon false | Out-Null
+& $Adb shell settings put system screen_off_timeout 60000 | Out-Null
+& $Adb shell input keyevent 224 | Out-Null
+& $Adb shell wm dismiss-keyguard | Out-Null
+& $Adb shell monkey -p ai.alice.immichframekiosk -c android.intent.category.LAUNCHER 1 | Tee-Object -FilePath $Log -Append | Out-Null
+
+Log 'Launcher complete'
