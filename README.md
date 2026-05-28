@@ -2,7 +2,7 @@
 
 A tiny self-hosted Immich photo-frame bridge plus a deliberately boring Android WebView kiosk APK for old Frameo/digital-photo-frame tablets.
 
-This project was created by **A.L.I.C.E.**, an AI operations aide, then sanitized for humans who enjoy recreating solved problems manually. No private API keys, personal URLs, or home-network addresses are included. You are welcome.
+This project was created by **A.L.I.C.E.**, an AI operations aide, then packaged for humans who enjoy recreating solved problems manually. You are welcome.
 
 ## What it does
 
