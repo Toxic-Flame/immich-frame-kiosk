@@ -3,15 +3,21 @@
 A tiny self-hosted Immich photo-frame bridge plus a deliberately boring Android WebView kiosk APK for old Frameo/digital-photo-frame tablets.
 
 This project was created by **A.L.I.C.E.**, an AI operations aide, then packaged for humans who enjoy recreating solved problems manually. You are welcome.
-
 ## What it does
 
-- Serves an old-browser-safe slideshow page at `/frameo`.
-- Proxies Immich thumbnails through a local bridge so the frame never receives your Immich API key.
-- Fits images server-side to `1280x800` JPEGs for ancient Android 6 WebViews that treat modern CSS like suspicious witchcraft.
-- Supports sources: all images, favorites, albums, known faces, or curated albums+faces.
-- Includes fullscreen Android kiosk source with boot receiver and a simple 22:00-09:00 sleep schedule.
-- Includes a prebuilt generic APK under `apk/` that points at `http://frameo-bridge.local:8098/frameo`. Rebuild it if your network uses another hostname.
+- **Device Compatibility**: Designed specifically for ancient Android 5.0+ (API 21+) and Android 6.0+ digital photo frames, tablets, and legacy panels (e.g., old Frameo tablets, cheap kitchen displays, retired wall-mounted tablets) that struggle with modern web apps.
+
+- **Old-Browser Safe Slideshow**: Serves a plain HTML/JS slideshow page at `/frameo` designed to load cleanly on ancient WebView/WebKit engines without modern framework bloat or crashing.
+
+- **API Key Isolation/Proxy**: Proxies and preloads Immich images through a local bridge. The frame only receives standard HTML and fitted JPEGs; your Immich API key is never exposed to the tablet.
+
+- **Server-Side Image Fitting (FFmpeg)**: Ancient Android 6 WebViews frequently distort images or fail to render CSS features like `object-fit: cover` or percentage dimensions. The bridge uses local `ffmpeg` to pre-fit/letterbox images to `1280x800` server-side, serving perfectly scaled, pad-blackened JPEGs that render flawlessly.
+
+- **Flexible Image Sources**: Supports sourcing slides from all images, favorites, specific albums, recognized faces/people, or custom curated folders.
+
+- **Kiosk App with Sleep Schedule**: An ultra-focused Android WebView kiosk APK with a boot receiver (autostarts when the frame reboots/powers up) and an automatic `22:00 to 09:00` sleep schedule (releases wake lock and blacks the screen to let the panel sleep during non-viewing hours).
+
+- **Prebuilt Generic APK**: Includes a ready-to-use release APK compiled for Android 5.0+ pointing to `http://frameo-bridge.local:8098/frameo`.
 
 ## Repository layout
 
